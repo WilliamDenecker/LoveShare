@@ -1,124 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { TopNav } from "@/components/TopNav";
+import { createClient } from "@/lib/supabase/client";
 
-type NoteItem = {
+// Define the shape of our data
+type Note = {
   id: string;
   title: string;
   body: string;
-  category: string;
-  updated_at: string;
   author: string;
+  created_at: string;
+  categories?: { name: string; color: string } | null;
 };
 
-const SHARED_STORAGE_KEY = "loveshare-shared-state-v1";
-
 export default function NotesPage() {
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [categories, setCategories] = useState<string[]>(["General"]);
-  const [noteForm, setNoteForm] = useState({ title: "", body: "", category: "General" });
-  const [categoryDraft, setCategoryDraft] = useState("");
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const readSharedState = () => {
-    const saved = window.localStorage.getItem(SHARED_STORAGE_KEY);
-    if (!saved) {
-      return { notes: [] as NoteItem[], categories: ["General"] as string[] };
+  // Form State
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [newBody, setNewBody] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const supabase = createClient();
+
+  // Helper to get whoever is logged in right now from our cookie
+  function getCurrentUser() {
+    if (typeof document !== "undefined") {
+      const match = document.cookie.match(/(^| )loveshare_user=([^;]+)/);
+      if (match) return match[2];
     }
+    return "Unknown";
+  }
 
-    try {
-      const parsed = JSON.parse(saved);
-      return {
-        notes: parsed.notes ?? [],
-        categories: parsed.categories?.length ? parsed.categories : ["General"],
-      };
-    } catch {
-      return { notes: [] as NoteItem[], categories: ["General"] as string[] };
+  // Fetch all notes from Supabase
+  async function fetchNotes() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("notes")
+      .select("id, title, body, author, created_at, categories(name, color)")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setNotes(data as any);
     }
-  };
+    setLoading(false);
+  }
 
-  const persistSharedState = (nextState: Partial<{ notes: NoteItem[]; categories: string[] }>) => {
-    const current = readSharedState();
-    const merged = {
-      notes: nextState.notes ?? current.notes,
-      categories: nextState.categories ?? current.categories,
-      events: [] as Array<{ id: string; title: string; start_time: string; category: string; creator_id: string }>,
-    };
+  // Load notes when the page opens
+  useEffect(() => {
+    fetchNotes();
+  }, []);
 
-    const existing = window.localStorage.getItem(SHARED_STORAGE_KEY);
-    if (existing) {
-      try {
-        const parsed = JSON.parse(existing);
-        merged.events = parsed.events ?? [];
-      } catch {
-        merged.events = [];
+  // Handle saving a new note
+  async function handleAddNote(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSaving(true);
+    const currentUser = getCurrentUser();
+    let categoryId = null;
+
+    // 1. If a category was typed, check if it exists or create a new one
+    if (newCategory.trim()) {
+      const { data: existingCat } = await supabase
+        .from("categories")
+        .select("id")
+        .ilike("name", newCategory.trim())
+        .single();
+
+      if (existingCat) {
+        categoryId = existingCat.id;
+      } else {
+        const { data: newCat } = await supabase
+          .from("categories")
+          .insert({ name: newCategory.trim(), color: "#f43f5e" }) // Default rose color
+          .select("id")
+          .single();
+        if (newCat) categoryId = newCat.id;
       }
     }
 
-    window.localStorage.setItem(SHARED_STORAGE_KEY, JSON.stringify(merged));
-    window.dispatchEvent(new Event("loveshare-state-changed"));
-  };
+    // 2. Insert the actual note
+    const { error } = await supabase.from("notes").insert({
+      title: newTitle,
+      body: newBody,
+      author: currentUser,
+      category_id: categoryId,
+    });
 
-  useEffect(() => {
-    const loadSharedState = () => {
-      const state = readSharedState();
-      setNotes(state.notes);
-      setCategories(state.categories);
-    };
-
-    loadSharedState();
-    window.addEventListener("storage", loadSharedState);
-    window.addEventListener("loveshare-state-changed", loadSharedState);
-
-    return () => {
-      window.removeEventListener("storage", loadSharedState);
-      window.removeEventListener("loveshare-state-changed", loadSharedState);
-    };
-  }, []);
-
-  useEffect(() => {
-    persistSharedState({ notes, categories });
-  }, [notes, categories]);
-
-  const addCategory = () => {
-    const value = categoryDraft.trim();
-    if (!value) return;
-    setCategories((current) => (current.includes(value) ? current : [...current, value]));
-    setCategoryDraft("");
-    setNoteForm((current) => ({ ...current, category: value }));
-  };
-
-  const removeCategory = (category: string) => {
-    if (category === "General") return;
-    setCategories((current) => current.filter((item) => item !== category));
-    setNotes((current) => current.map((note) => (note.category === category ? { ...note, category: "General" } : note)));
-  };
-
-  const addNote = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!noteForm.title.trim() || !noteForm.body.trim()) return;
-
-    const category = noteForm.category || "General";
-    if (!categories.includes(category)) {
-      setCategories((current) => [...current, category]);
+    if (!error) {
+      setIsModalOpen(false); // Close the modal
+      setNewTitle("");       // Reset fields
+      setNewCategory("");
+      setNewBody("");
+      fetchNotes();          // Refresh the screen to show the new note
+    } else {
+      alert("Error saving note: " + error.message);
     }
-
-    const newNote: NoteItem = {
-      id: crypto.randomUUID(),
-      title: noteForm.title.trim(),
-      body: noteForm.body.trim(),
-      category,
-      updated_at: new Date().toISOString(),
-      author: "You",
-    };
-
-    setNotes((current) => [newNote, ...current]);
-    setNoteForm({ title: "", body: "", category });
-  };
-
-  const removeNote = (noteId: string) => {
-    setNotes((current) => current.filter((note) => note.id !== noteId));
-  };
+    setIsSaving(false);
+  }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#fff7f7,#fef2f2,#ffe4e6)]">
@@ -129,60 +111,102 @@ export default function NotesPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-400">Shared notes</p>
             <h1 className="text-3xl font-black text-slate-900">Notes</h1>
           </div>
-          <div className="text-sm font-semibold text-slate-500">Add, edit, or remove notes anytime</div>
-        </div>
-
-        <form onSubmit={addNote} className="mb-4 rounded-[28px] bg-white p-4 shadow-soft">
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-            <input value={noteForm.title} onChange={(event) => setNoteForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" className="rounded-xl border border-rose-100 px-3 py-2 text-sm" required />
-            <select value={noteForm.category} onChange={(event) => setNoteForm((current) => ({ ...current, category: event.target.value }))} className="rounded-xl border border-rose-100 px-3 py-2 text-sm">
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white">
-              Add note
-            </button>
-          </div>
-          <textarea value={noteForm.body} onChange={(event) => setNoteForm((current) => ({ ...current, body: event.target.value }))} placeholder="Note" className="mt-3 min-h-24 w-full rounded-xl border border-rose-100 px-3 py-2 text-sm" required />
-        </form>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <button key={category} onClick={() => removeCategory(category)} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-soft">
-              {category} ×
-            </button>
-          ))}
-          <input value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} placeholder="New category" className="rounded-full border border-rose-100 px-3 py-1 text-xs" />
-          <button onClick={addCategory} className="rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold text-white">
-            Add category
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-2xl bg-rose-500 px-4 py-2 font-semibold text-white shadow-soft hover:bg-rose-600 transition-colors"
+          >
+            New note
           </button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {notes.length === 0 ? (
-            <div className="rounded-[28px] bg-white p-5 text-sm text-slate-500 shadow-soft md:col-span-2">Nothing here yet. Add your first note and category above.</div>
-          ) : (
-            notes.map((note) => (
+        {loading ? (
+          <p className="text-slate-500">Loading your notes...</p>
+        ) : notes.length === 0 ? (
+          <div className="rounded-[28px] border-2 border-dashed border-rose-200 p-10 text-center text-slate-500">
+            No notes yet. Click "New note" to start sharing!
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {notes.map((note) => (
               <article key={note.id} className="rounded-[28px] bg-white p-5 shadow-soft">
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-4 flex items-start justify-between">
                   <div>
-                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-500">{note.category}</span>
+                    {note.categories && (
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-500">
+                        {note.categories.name}
+                      </span>
+                    )}
                     <h2 className="mt-3 text-xl font-bold text-slate-900">{note.title}</h2>
                   </div>
-                  <button onClick={() => removeNote(note.id)} className="text-sm font-semibold text-rose-500">
-                    Remove
-                  </button>
+                  <span className="text-xs font-medium text-slate-400">{note.author}</span>
                 </div>
-                <p className="text-sm text-slate-600">{note.body}</p>
-                <div className="mt-5 border-t border-rose-50 pt-3 text-xs text-slate-400">Updated {new Date(note.updated_at).toLocaleString()}</div>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>
+                <div className="mt-5 border-t border-rose-50 pt-3 text-xs text-slate-400">
+                  Added {new Date(note.created_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                </div>
               </article>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* NEW NOTE MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[32px] bg-white p-6 shadow-xl">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Add a new note</h2>
+            <form onSubmit={handleAddNote} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                <input
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300"
+                  placeholder="E.g., Date ideas"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Category (Optional)</label>
+                <input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300"
+                  placeholder="E.g., Groceries"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Note Details</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={newBody}
+                  onChange={(e) => setNewBody(e.target.value)}
+                  className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300 resize-none"
+                  placeholder="What's on your mind?"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 font-semibold text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 rounded-2xl bg-rose-500 px-4 py-3 font-semibold text-white shadow-soft hover:bg-rose-600 transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save note"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
