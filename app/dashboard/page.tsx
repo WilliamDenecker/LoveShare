@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [expandedNoteIds, setExpandedNoteIds] = useState<string[]>([]);
   
-  // 1. State to prevent the React Hydration freeze!
+  // State to prevent the React Hydration freeze!
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -73,7 +73,11 @@ export default function DashboardPage() {
     }
 
     // Fetch calendar events
-    const { data: eventsData } = await supabase.from("events").select("*");
+    const { data: eventsData } = await supabase
+      .from("events")
+      .select("*")
+      .order("start_time", { ascending: true });
+      
     if (eventsData) setEvents(eventsData);
 
     setLoading(false);
@@ -152,7 +156,7 @@ export default function DashboardPage() {
     );
   };
 
-  // 2. Prevent rendering until the client is ready to avoid the freeze!
+  // Prevent rendering until the client is ready to avoid the freeze!
   if (!isMounted) return null;
 
   return (
@@ -188,6 +192,10 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {filteredNotes.map((note) => {
                   const expanded = expandedNoteIds.includes(note.id);
+                  
+                  // Bulletproof Date format for Notes
+                  const d = new Date(note.created_at);
+                  const formattedNoteDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
                   return (
                     <div key={note.id} className="rounded-2xl border border-slate-100 bg-white">
@@ -201,10 +209,10 @@ export default function DashboardPage() {
 
                       {expanded ? (
                         <div className="border-t border-rose-50 px-4 py-3">
-                          <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>
-                          <div className="mt-3 flex items-center justify-between">
+                          {note.body && <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>}
+                          <div className={`mt-3 flex items-center justify-between ${!note.body ? "border-t-0 pt-0" : ""}`}>
                             <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-500">{note.category}</span>
-                            <span className="text-xs text-slate-400">{new Date(note.created_at).toLocaleDateString()}</span>
+                            <span className="text-xs text-slate-400">{formattedNoteDate}</span>
                           </div>
 
                           {note.tasks.length > 0 && (
@@ -253,17 +261,28 @@ export default function DashboardPage() {
 
           <aside className="space-y-4">
             <section className="rounded-[28px] bg-white p-4 shadow-soft">
-              <h2 className="mb-3 text-xl font-bold text-slate-900">Calendar</h2>
+              <h2 className="mb-3 text-xl font-bold text-slate-900">Calendar Overview</h2>
               <div className="space-y-2">
                 {events.length === 0 ? (
                   <p className="text-sm text-slate-500">No upcoming events.</p>
                 ) : (
-                  events.map((event) => (
-                    <div key={event.id} className="rounded-2xl bg-slate-50 px-3 py-3 border border-slate-100">
-                      <div className="font-semibold text-slate-800">{event.title}</div>
-                      <div className="text-xs text-slate-500">{new Date(event.start_time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</div>
-                    </div>
-                  ))
+                  events.slice(0, 5).map((event) => {
+                    // Bulletproof Date format for Dashboard Calendar View
+                    const eDate = new Date(event.start_time);
+                    const eDay = String(eDate.getDate()).padStart(2, '0');
+                    const eMonth = String(eDate.getMonth() + 1).padStart(2, '0');
+                    const eYear = eDate.getFullYear();
+                    const eHours = String(eDate.getHours()).padStart(2, '0');
+                    const eMins = String(eDate.getMinutes()).padStart(2, '0');
+                    const formattedEventDate = `${eDay}/${eMonth}/${eYear}, ${eHours}:${eMins}`;
+
+                    return (
+                      <div key={event.id} className="rounded-2xl bg-slate-50 px-3 py-3 border border-slate-100">
+                        <div className="font-semibold text-slate-800">{event.title}</div>
+                        <div className="text-xs text-slate-500">{formattedEventDate}</div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </section>
