@@ -1,0 +1,36 @@
+import { TopNav } from "@/components/TopNav";
+
+const events = [
+  { id: 1, title: "Anniversary dinner", date: "2026-07-04", category: "anniversary", time: "7:30 PM" },
+  { id: 2, title: "Beach picnic", date: "2026-07-11", category: "date night", time: "4:00 PM" },
+  { id: 3, title: "Doctor appointment", date: "2026-07-06", category: "reminder", time: "10:00 AM" },
+];
+
+export default function CalendarPage() {
+  return (
+    <main className="min-h-screen bg-[linear-gradient(180deg,#fff7f7,#fff1f2,#ffe4e6)]">
+      <TopNav />
+      <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mb-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-400">Shared calendar</p>
+          <h1 className="text-3xl font-black text-slate-900">Calendar</h1>
+        </div>
+
+        <div className="space-y-3">
+          {events.map((event) => (
+            <div key={event.id} className="flex items-center justify-between rounded-[24px] bg-white px-5 py-4 shadow-soft">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.3em] text-rose-400">{event.category}</div>
+                <div className="text-lg font-semibold text-slate-900">{event.title}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold text-slate-700">{event.date}</div>
+                <div className="text-xs text-slate-500">{event.time}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
