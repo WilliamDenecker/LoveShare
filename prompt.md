@@ -7,7 +7,7 @@ Build a private, love-themed web app for two people (a couple) to share notes, t
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind CSS
 - **Backend/DB:** Supabase (Postgres + Auth + Storage + Row Level Security)
 - **Hosting:** Vercel
-- **Calendar sync:** Google Calendar API (Android calendar syncs via Google Calendar, so sync through Google's API rather than direct Android integration)
+- **Calendar sync:** Android Calendar native integration (open shared events directly in the Android device calendar app, using native calendar deep links instead of external OAuth-based sync)
 
 ## Core Features
 
@@ -33,8 +33,8 @@ Build a private, love-themed web app for two people (a couple) to share notes, t
 
 ### 4. Shared Calendar
 - Shared events visible to both partners
-- Two-way sync with Android/Google Calendar via Google Calendar API (OAuth per user, each connects their own Google account)
-- Events created in-app push to Google Calendar; events from Google Calendar pull into the app
+- Shared events open in the Android Calendar app on supported devices, with local calendar deep-link access for event times and reminders
+- Events can be created in-app and linked to the Android calendar for quick viewing; no Google OAuth sync is required for the basic Android flow
 - Color-code events by creator or category (date night, anniversary, reminder, etc.)
 
 ### 5. Month/Year Reviews ("Recap")
@@ -59,7 +59,7 @@ Build a private, love-themed web app for two people (a couple) to share notes, t
 
 ## Deployment
 - Repo on GitHub → connected to Vercel for CI/CD
-- Environment variables for Supabase URL/anon key + Google Calendar OAuth credentials stored in Vercel project settings
+- Environment variables for Supabase URL/anon key stored in Vercel project settings; Android calendar integration uses native device deep links rather than backend OAuth credentials
 - Supabase Storage bucket for photos, with signed URLs or RLS-based access policies
 
 ## Deliverables

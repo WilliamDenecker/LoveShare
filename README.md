@@ -23,9 +23,9 @@ A private shared couple app built with Next.js, Supabase, and Vercel.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
-4. Enable the Storage bucket and configure Google Calendar OAuth credentials.
+4. Enable the Storage bucket and use the built-in Android calendar integration for shared events.
 
-## Google Calendar OAuth
-1. Create OAuth client credentials in Google Cloud Console.
-2. Add authorized redirect URI for your app: `https://YOUR_APP.vercel.app/auth/callback`.
-3. Store the client ID and secret in Vercel environment variables.
+## Android Calendar integration
+1. On Android devices, the app opens the native calendar app using a calendar deep link.
+2. Use the “Open Android Calendar” action from the shared calendar view to jump straight to the event time in the device calendar.
+3. No extra OAuth setup is required for the native Android calendar flow.
