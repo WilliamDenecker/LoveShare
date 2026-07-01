@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/client";
 import { Note, Category } from "@/lib/types";
@@ -28,7 +29,7 @@ export default function NotesPage() {
 
   const supabase = createClient();
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const [notesRes, catRes] = await Promise.all([
       supabase.from("notes").select("*, categories(name, color)").order("created_at", { ascending: false }),
@@ -38,11 +39,11 @@ export default function NotesPage() {
     if (notesRes.data) setNotes(notesRes.data as Note[]);
     if (catRes.data) setCategories(catRes.data as Category[]);
     setLoading(false);
-  }
+  }, [supabase]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   function openModal(note?: Note) {
     setEditingNoteId(note?.id || null);
@@ -146,7 +147,7 @@ export default function NotesPage() {
         {loading ? (
           <p className="text-slate-500">Loading your notes...</p>
         ) : notes.length === 0 ? (
-          <div className="rounded-[28px] border-2 border-dashed border-rose-200 p-10 text-center text-slate-500">No notes yet. Click "New Note" to start sharing!</div>
+          <div className="rounded-[28px] border-2 border-dashed border-rose-200 p-10 text-center text-slate-500">No notes yet. Click &quot;New Note&quot; to start sharing!</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {sortedNotes.map((note) => (
@@ -177,7 +178,7 @@ export default function NotesPage() {
                         <div className="text-xs font-bold uppercase tracking-wider text-rose-500">✓ Completed</div>
                         <button onClick={() => toggleNoteCompletion(note.id)} className="text-xs text-slate-400 underline hover:text-slate-600">Revert</button>
                       </div>
-                      {note.image_url && <img src={note.image_url} alt="Note memory" className="mt-2 h-40 w-full rounded-xl object-cover shadow-sm" />}
+                      {note.image_url && <div className="mt-2 h-40 w-full relative"><Image src={note.image_url} alt="Note memory" fill className="rounded-xl object-cover shadow-sm" unoptimized /></div>}
                     </div>
                   ) : (
                     <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/50 px-4 py-3 text-sm font-semibold text-rose-500 hover:bg-rose-50 transition-colors">

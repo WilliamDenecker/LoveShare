@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/client";
 import { CalendarEvent, Category } from "@/lib/types";
@@ -28,7 +28,7 @@ export default function CalendarPage() {
 
   const supabase = createClient();
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const [eventsRes, catRes] = await Promise.all([
       supabase.from("events").select("*").order("start_time", { ascending: true }),
@@ -38,12 +38,12 @@ export default function CalendarPage() {
     if (eventsRes.data) setEvents(eventsRes.data as CalendarEvent[]);
     if (catRes.data) setCategories(catRes.data as Category[]);
     setLoading(false);
-  }
+  }, [supabase]);
 
   useEffect(() => {
     setIsMounted(true);
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   async function handleAddEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -162,7 +162,7 @@ export default function CalendarPage() {
           <div className="w-full max-w-md rounded-[32px] bg-white p-6 shadow-xl">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Add a new event</h2>
             <form onSubmit={handleAddEvent} className="space-y-4">
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">What's happening?</label><input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none" placeholder="E.g., Dinner at Luigi's" /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">What&apos;s happening?</label><input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none" placeholder="E.g., Dinner at Luigi's" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">Date</label><input required type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none" /></div>
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">Time (24h)</label><input required type="text" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none" placeholder="19:30" /></div>

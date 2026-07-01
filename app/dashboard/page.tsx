@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/client";
 import { Note, CalendarEvent } from "@/lib/types";
@@ -17,14 +17,8 @@ export default function DashboardPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    setIsMounted(true);
-    fetchDashboardData();
-  }, []);
-
-  async function fetchDashboardData() {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
-    // Added category_id to the select query
     const { data: notesData } = await supabase
       .from("notes")
       .select("id, title, body, author, created_at, category_id, categories(name), tasks(id, description, is_complete, completed_by, completed_at)")
@@ -35,7 +29,7 @@ export default function DashboardPage() {
         id: n.id,
         title: n.title,
         body: n.body || "",
-        category_id: n.category_id || null, // Included the missing property!
+        category_id: n.category_id || null,
         category: n.categories?.name || "Uncategorized",
         created_at: n.created_at,
         author: n.author || "Unknown",
@@ -48,7 +42,12 @@ export default function DashboardPage() {
     const { data: eventsData } = await supabase.from("events").select("*").order("start_time", { ascending: true });
     if (eventsData) setEvents(eventsData as CalendarEvent[]);
     setLoading(false);
-  }
+  }, [supabase]);
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const categories = useMemo(() => ["All", ...Array.from(new Set(notes.map((n) => n.category as string)))], [notes]);
   const filteredNotes = categoryFilter === "All" ? notes : notes.filter((n) => n.category === categoryFilter);
