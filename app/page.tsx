@@ -15,9 +15,6 @@ export default function HomePage() {
           <Link href="/auth/login" className="rounded-2xl bg-rose-500 px-6 py-3 font-semibold text-white shadow-soft hover:bg-rose-600">
             Open your home
           </Link>
-          <Link href="/dashboard" className="rounded-2xl border border-rose-200 bg-white px-6 py-3 font-semibold text-rose-500 hover:border-rose-300">
-            View dashboard
-          </Link>
         </div>
       </div>
     </main>

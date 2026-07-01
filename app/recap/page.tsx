@@ -1,48 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { TopNav } from "@/components/TopNav";
 
-const recapItems = [
-  {
-    id: 1,
-    title: "Sunset dinner reservation",
-    note: "We made our anniversary dinner reservation and saved the evening for our favorite table.",
-    date: "2026-06-14",
-    period: "Month",
-    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 2,
-    title: "Summer passport check",
-    note: "We finished the travel prep and had our passports ready for the trip ahead.",
-    date: "2026-06-21",
-    period: "Year",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 3,
-    title: "Beach picnic date",
-    note: "A simple picnic by the shore, with our favorite snacks and music for the afternoon.",
-    date: "2026-07-11",
-    period: "All time",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 4,
-    title: "Gift planning",
-    note: "We picked out a thoughtful anniversary gift and wrapped it with care.",
-    date: "2026-05-18",
-    period: "Year",
-    image: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=800&q=80",
-  },
-];
-
 export default function RecapPage() {
   const [period, setPeriod] = useState("Month");
-
-  const visibleItems = recapItems.filter((item) => (period === "All time" ? true : item.period === period));
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#fff7f7,#fff1f2,#ffe4e6)]">
@@ -76,19 +38,8 @@ export default function RecapPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          {visibleItems.map((item) => (
-            <article key={item.id} className="overflow-hidden rounded-[28px] bg-white shadow-soft">
-              <Image src={item.image} alt={item.title} width={800} height={224} unoptimized className="h-56 w-full object-cover" />
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-slate-900">{item.title}</h2>
-                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-500">{item.date}</span>
-                </div>
-                <p className="mt-3 text-sm text-slate-600">{item.note}</p>
-              </div>
-            </article>
-          ))}
+        <div className="rounded-[28px] bg-white p-6 text-center text-sm text-slate-500 shadow-soft">
+          Your recap will appear here once you add notes, tasks, and calendar moments.
         </div>
       </div>
     </main>

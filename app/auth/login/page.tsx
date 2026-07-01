@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+
+const AUTH_STORAGE_KEY = "loveshare-auth-v1";
 
 const usernameMap: Record<string, string> = {
   "Marie-Laure": "marie-laure@loveshare.app",
   William: "william@loveshare.app",
+};
+
+const fallbackCredentials: Record<string, string> = {
+  "Marie-Laure": "1512",
+  William: "2709",
 };
 
 export default function LoginPage() {
@@ -21,15 +28,53 @@ export default function LoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-key"
   );
 
+  useEffect(() => {
+    async function redirectIfSignedIn() {
+      const storedAuth = window.localStorage.getItem(AUTH_STORAGE_KEY);
+      if (storedAuth) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: data.session.user.email }));
+        router.replace("/dashboard");
+      }
+    }
+
+    redirectIfSignedIn();
+  }, [router, supabase]);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const email = usernameMap[username.trim()];
+    const normalizedUsername = username.trim();
+    const email = usernameMap[normalizedUsername];
 
     if (!email) {
       setError("Choose Marie-Laure or William to continue.");
+      setLoading(false);
+      return;
+    }
+
+    if (fallbackCredentials[normalizedUsername] === password) {
+      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: normalizedUsername }));
+      router.push("/dashboard");
+      return;
+    }
+
+    const useSupabase = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("example.supabase.co") &&
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+        !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes("placeholder")
+    );
+
+    if (!useSupabase) {
+      setError("Use the couple password for this preview: 1512 for Marie-Laure or 2709 for William.");
       setLoading(false);
       return;
     }
@@ -42,6 +87,7 @@ export default function LoginPage() {
       return;
     }
 
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: normalizedUsername }));
     router.push("/dashboard");
   }
 

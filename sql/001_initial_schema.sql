@@ -50,24 +50,61 @@ alter table tasks enable row level security;
 alter table task_photos enable row level security;
 alter table events enable row level security;
 
-create policy if not exists notes_select_all on notes for select using (auth.uid() is not null);
-create policy if not exists notes_insert_all on notes for insert with check (auth.uid() is not null);
-create policy if not exists notes_update_all on notes for update using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy if not exists notes_delete_all on notes for delete using (auth.uid() is not null);
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'notes' and policyname = 'notes_select_all') then
+    create policy notes_select_all on notes for select using (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'notes' and policyname = 'notes_insert_all') then
+    create policy notes_insert_all on notes for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'notes' and policyname = 'notes_update_all') then
+    create policy notes_update_all on notes for update using (auth.uid() is not null) with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'notes' and policyname = 'notes_delete_all') then
+    create policy notes_delete_all on notes for delete using (auth.uid() is not null);
+  end if;
 
-create policy if not exists categories_select_all on categories for select using (auth.uid() is not null);
-create policy if not exists categories_insert_all on categories for insert with check (auth.uid() is not null);
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'categories' and policyname = 'categories_select_all') then
+    create policy categories_select_all on categories for select using (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'categories' and policyname = 'categories_insert_all') then
+    create policy categories_insert_all on categories for insert with check (auth.uid() is not null);
+  end if;
 
-create policy if not exists tasks_select_all on tasks for select using (auth.uid() is not null);
-create policy if not exists tasks_insert_all on tasks for insert with check (auth.uid() is not null);
-create policy if not exists tasks_update_all on tasks for update using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy if not exists tasks_delete_all on tasks for delete using (auth.uid() is not null);
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'tasks' and policyname = 'tasks_select_all') then
+    create policy tasks_select_all on tasks for select using (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'tasks' and policyname = 'tasks_insert_all') then
+    create policy tasks_insert_all on tasks for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'tasks' and policyname = 'tasks_update_all') then
+    create policy tasks_update_all on tasks for update using (auth.uid() is not null) with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'tasks' and policyname = 'tasks_delete_all') then
+    create policy tasks_delete_all on tasks for delete using (auth.uid() is not null);
+  end if;
 
-create policy if not exists task_photos_select_all on task_photos for select using (auth.uid() is not null);
-create policy if not exists task_photos_insert_all on task_photos for insert with check (auth.uid() is not null);
-create policy if not exists task_photos_delete_all on task_photos for delete using (auth.uid() is not null);
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'task_photos' and policyname = 'task_photos_select_all') then
+    create policy task_photos_select_all on task_photos for select using (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'task_photos' and policyname = 'task_photos_insert_all') then
+    create policy task_photos_insert_all on task_photos for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'task_photos' and policyname = 'task_photos_delete_all') then
+    create policy task_photos_delete_all on task_photos for delete using (auth.uid() is not null);
+  end if;
 
-create policy if not exists events_select_all on events for select using (auth.uid() is not null);
-create policy if not exists events_insert_all on events for insert with check (auth.uid() is not null);
-create policy if not exists events_update_all on events for update using (auth.uid() is not null) with check (auth.uid() is not null);
-create policy if not exists events_delete_all on events for delete using (auth.uid() is not null);
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'events' and policyname = 'events_select_all') then
+    create policy events_select_all on events for select using (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'events' and policyname = 'events_insert_all') then
+    create policy events_insert_all on events for insert with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'events' and policyname = 'events_update_all') then
+    create policy events_update_all on events for update using (auth.uid() is not null) with check (auth.uid() is not null);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'events' and policyname = 'events_delete_all') then
+    create policy events_delete_all on events for delete using (auth.uid() is not null);
+  end if;
+end $$;
