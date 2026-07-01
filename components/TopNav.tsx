@@ -29,7 +29,7 @@ export function TopNav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-500">❤</span>
-          <span className="text-lg font-bold text-slate-900 hidden sm:block">LoveShare</span>
+          <span className="text-lg font-bold text-slate-900 hidden sm:block">CoupleNotes</span>
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">

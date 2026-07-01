@@ -1,18 +1,15 @@
 import type { Metadata } from "next";
-import "./globals.css";
-import { RequireAuth } from "@/components/RequireAuth";
+import "./globals.css"; // Back to the standard relative path
 
 export const metadata: Metadata = {
-  title: "LoveShare",
+  title: "CoupleNotes",
   description: "A private shared space for two hearts.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <RequireAuth>{children}</RequireAuth>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
