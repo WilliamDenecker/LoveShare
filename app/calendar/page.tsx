@@ -74,7 +74,6 @@ export default function CalendarPage() {
     setIsSavingEvent(true);
     const currentUser = getCurrentUser();
 
-    // Ensure time is 5 characters (e.g. "9:30" becomes "09:30") to prevent database date errors
     const paddedTime = newTime.length === 4 ? `0${newTime}` : newTime;
     const start_time = new Date(`${newDate}T${paddedTime}`).toISOString();
 
@@ -108,24 +107,27 @@ export default function CalendarPage() {
       color: "#f43f5e",
     });
 
-    if (error) {
-      alert("Failed to create category: " + error.message);
-    } else {
-      setIsCatModalOpen(false);
+    if (error) alert("Failed to create category: " + error.message);
+    else {
       setNewCatName("");
       await fetchData(); 
     }
     setIsSavingCat(false);
   }
 
+  // NEW DELETE CATEGORY FUNCTION
+  async function handleDeleteCategory(id: string) {
+    if (!confirm("Delete this category? Any events using it will become 'Uncategorized'.")) return;
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (error) alert("Failed to delete category: " + error.message);
+    else await fetchData();
+  }
+
   async function handleDeleteEvent(id: string) {
     if (!confirm("Are you sure you want to delete this event?")) return;
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (!error) {
-      await fetchData();
-    } else {
-      alert("Failed to delete: " + error.message);
-    }
+    if (!error) await fetchData();
+    else alert("Failed to delete: " + error.message);
   }
 
   const openAndroidCalendar = (startTime: string) => {
@@ -154,7 +156,7 @@ export default function CalendarPage() {
               onClick={() => setIsCatModalOpen(true)}
               className="rounded-2xl border border-rose-200 bg-white px-4 py-2 font-semibold text-rose-500 shadow-soft hover:border-rose-300 transition-colors"
             >
-              New Category
+              Categories
             </button>
             <button 
               onClick={() => setIsEventModalOpen(true)}
@@ -191,8 +193,6 @@ export default function CalendarPage() {
           <div className="space-y-3">
             {filteredEvents.map((event) => {
               const eventDate = new Date(event.start_time);
-              
-              // BULLETPROOF DATE FORMATTING: DD/MM/YYYY and strict 24h HH:mm
               const day = String(eventDate.getDate()).padStart(2, '0');
               const month = String(eventDate.getMonth() + 1).padStart(2, '0');
               const year = eventDate.getFullYear();
@@ -232,7 +232,6 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* NEW EVENT MODAL */}
       {isEventModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[32px] bg-white p-6 shadow-xl">
@@ -250,30 +249,15 @@ export default function CalendarPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Time (24h)</label>
-                  <input 
-                    required 
-                    type="text" 
-                    pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
-                    value={newTime} 
-                    onChange={(e) => setNewTime(e.target.value)} 
-                    className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300" 
-                    placeholder="19:30"
-                    title="Please enter a 24-hour time like 19:30"
-                  />
+                  <input required type="text" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300" placeholder="19:30" title="Please enter a 24-hour time like 19:30" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                <select 
-                  value={selectedCategoryName} 
-                  onChange={(e) => setSelectedCategoryName(e.target.value)} 
-                  className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300"
-                >
+                <select value={selectedCategoryName} onChange={(e) => setSelectedCategoryName(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300">
                   <option value="">No category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
-                  ))}
+                  {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                 </select>
               </div>
               
@@ -288,21 +272,37 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* CATEGORY MODAL */}
+      {/* UPDATED MANAGE CATEGORIES MODAL */}
       {isCatModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-[32px] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Create Category</h2>
-            <form onSubmit={handleAddCategory} className="space-y-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Categories</h2>
+              <button onClick={() => setIsCatModalOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors">✕</button>
+            </div>
+            
+            <div className="mb-6 max-h-48 overflow-y-auto space-y-2 pr-1">
+              {categories.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No categories yet.</p>
+              ) : (
+                categories.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 border border-slate-100">
+                    <span className="text-sm font-semibold text-slate-700">{cat.name}</span>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-red-100 hover:text-red-500 transition-colors" title="Delete category">✕</button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form onSubmit={handleAddCategory} className="space-y-4 border-t border-rose-50 pt-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Category Name</label>
-                <input required value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 outline-none focus:border-rose-300" placeholder="E.g., Travel, Health" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setIsCatModalOpen(false)} className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 font-semibold text-slate-600 hover:bg-slate-200 transition-colors">Cancel</button>
-                <button type="submit" disabled={isSavingCat} className="flex-1 rounded-2xl bg-rose-500 px-4 py-3 font-semibold text-white shadow-soft hover:bg-rose-600 transition-colors disabled:opacity-50">
-                  {isSavingCat ? "Creating..." : "Create"}
-                </button>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Add New Category</label>
+                <div className="flex gap-2">
+                  <input required value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-2 outline-none focus:border-rose-300" placeholder="E.g., Travel" />
+                  <button type="submit" disabled={isSavingCat} className="rounded-2xl bg-rose-500 px-4 py-2 font-semibold text-white shadow-soft hover:bg-rose-600 transition-colors disabled:opacity-50">
+                    Add
+                  </button>
+                </div>
               </div>
             </form>
           </div>

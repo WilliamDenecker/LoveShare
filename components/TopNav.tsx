@@ -8,7 +8,7 @@ const tabs = [
   { href: "/dashboard", label: "Dashboard", icon: FiBookOpen },
   { href: "/notes", label: "Notes", icon: FiCheckSquare },
   { href: "/calendar", label: "Calendar", icon: FiCalendar },
-  { href: "/recap", label: "Recap", icon: FiHeart },
+  //{ href: "/recap", label: "Recap", icon: FiHeart },
 ];
 
 export function TopNav() {
