@@ -12,10 +12,14 @@ export default function NotesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"date" | "category">("date");
-
+  
   // Modals
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  
+  // Image Loading State (Debug)
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+  const [isFetchingImage, setIsFetchingImage] = useState<string | null>(null);
 
   // Form States
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -30,33 +34,67 @@ export default function NotesPage() {
   const supabase = createClient();
 
   const fetchData = useCallback(async () => {
-  setLoading(true);
-  
-  // Update the query to be more explicit, similar to the Dashboard
-  const { data: notesData, error } = await supabase
-      .from("notes")
-      .select("*, categories(name, color)")
-      .order("created_at", { ascending: false });
+    setLoading(true);
+    console.log("[DEBUG] Fetching initial notes list...");
+    const startTime = performance.now();
 
-    if (error) {
-      console.error("Error fetching notes:", error);
-    } else if (notesData) {
-      setNotes(notesData as Note[]);
-    }
+    // FIXED: Instead of "*", explicitly select columns EXCEPT image_url
+    const [notesRes, catRes] = await Promise.all([
+      supabase
+        .from("notes")
+        .select("id, title, body, author, created_at, category_id, is_complete, categories(name, color)")
+        .order("created_at", { ascending: false }),
+      supabase.from("categories").select("*").order("name", { ascending: true })
+    ]);
 
-    const { data: catRes } = await supabase
-      .from("categories")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (catRes) setCategories(catRes as Category[]);
+    const endTime = performance.now();
     
+    if (notesRes.data) {
+      const payloadSizeKB = JSON.stringify(notesRes.data).length / 1024;
+      console.log(`[DEBUG] Fetched ${notesRes.data.length} notes in ${(endTime - startTime).toFixed(2)}ms.`);
+      console.log(`[DEBUG] Initial payload size: ~${payloadSizeKB.toFixed(2)} KB (Images excluded)`);
+      
+      // UPDATE THIS LINE:
+      setNotes(notesRes.data as unknown as Note[]);
+    }
+    
+    if (catRes.data) setCategories(catRes.data as Category[]);
     setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // FIXED: Fetch the image only when requested
+  async function fetchAndShowImage(noteId: string) {
+    setIsFetchingImage(noteId);
+    console.log(`[DEBUG] Requesting full image for note ID: ${noteId}`);
+    const startTime = performance.now();
+
+    const { data, error } = await supabase
+      .from("notes")
+      .select("image_url")
+      .eq("id", noteId)
+      .single();
+
+    const endTime = performance.now();
+
+    if (error) {
+      console.error("[DEBUG] Error fetching image:", error);
+      alert("Failed to load image.");
+    } else if (data?.image_url) {
+      const imageSizeMB = data.image_url.length / (1024 * 1024);
+      console.log(`[DEBUG] Image fetched in ${(endTime - startTime).toFixed(2)}ms.`);
+      console.log(`[DEBUG] Downloaded image size: ~${imageSizeMB.toFixed(2)} MB`);
+      setEnlargedImage(data.image_url);
+    } else {
+      console.log("[DEBUG] No image found in database for this note.");
+      alert("No image attached to this note.");
+    }
+    
+    setIsFetchingImage(null);
+  }
 
   function openModal(note?: Note) {
     setEditingNoteId(note?.id || null);
@@ -113,7 +151,11 @@ export default function NotesPage() {
   async function toggleNoteCompletion(id: string, file?: File) {
     try {
       const isCompleting = !!file;
+      console.log("[DEBUG] Processing image upload...");
       const image_url = file ? await convertFileToBase64(file) : null;
+      if (image_url) {
+         console.log(`[DEBUG] Upload payload size: ~${(image_url.length / (1024 * 1024)).toFixed(2)} MB`);
+      }
       
       const { error } = await supabase.from("notes").update({ is_complete: isCompleting, image_url }).eq("id", id);
       if (error) throw error;
@@ -191,7 +233,15 @@ export default function NotesPage() {
                         <div className="text-xs font-bold uppercase tracking-wider text-rose-500">✓ Completed</div>
                         <button onClick={() => toggleNoteCompletion(note.id)} className="text-xs text-slate-400 underline hover:text-slate-600">Revert</button>
                       </div>
-                      {note.image_url && <div className="mt-2 h-40 w-full relative"><Image src={note.image_url} alt="Note memory" fill className="rounded-xl object-cover shadow-sm" unoptimized /></div>}
+                      
+                      <button 
+                        onClick={() => fetchAndShowImage(note.id)}
+                        disabled={isFetchingImage === note.id}
+                        className="mt-2 text-xs font-semibold text-rose-500 hover:underline disabled:text-rose-300 disabled:no-underline"
+                      >
+                        {isFetchingImage === note.id ? "Fetching image..." : "View memory photo"}
+                      </button>
+                      
                     </div>
                   ) : (
                     <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/50 px-4 py-3 text-sm font-semibold text-rose-500 hover:bg-rose-50 transition-colors">
@@ -251,6 +301,30 @@ export default function NotesPage() {
                 <button type="submit" disabled={isSavingCat} className="rounded-2xl bg-rose-500 px-4 py-2 font-semibold text-white">Add</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {enlargedImage && (
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setEnlargedImage(null)}
+        >
+          <div className="relative max-w-4xl w-full h-auto">
+            <Image 
+              src={enlargedImage} 
+              alt="Enlarged memory" 
+              width={800} 
+              height={600} 
+              className="rounded-2xl w-full h-auto" 
+              unoptimized 
+            />
+            <button 
+              onClick={() => setEnlargedImage(null)}
+              className="absolute -top-10 right-0 text-white font-bold"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
