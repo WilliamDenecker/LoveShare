@@ -5,7 +5,7 @@ import Image from "next/image";
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/client";
 import { Note, Category } from "@/lib/types";
-import { getCurrentUser, formatDateTime, convertFileToBase64 } from "@/lib/utils";
+import { getCurrentUser, formatDateTime } from "@/lib/utils"; // Removed convertFileToBase64
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -17,7 +17,7 @@ export default function NotesPage() {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   
-  // Image Loading State (Debug)
+  // Image Loading State (Modal & Fetching)
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const [isFetchingImage, setIsFetchingImage] = useState<string | null>(null);
 
@@ -33,12 +33,9 @@ export default function NotesPage() {
 
   const supabase = createClient();
 
+  // 1. Optimized Initial Fetch (No images downloaded on load)
   const fetchData = useCallback(async () => {
     setLoading(true);
-    console.log("[DEBUG] Fetching initial notes list...");
-    const startTime = performance.now();
-
-    // FIXED: Instead of "*", explicitly select columns EXCEPT image_url
     const [notesRes, catRes] = await Promise.all([
       supabase
         .from("notes")
@@ -47,17 +44,7 @@ export default function NotesPage() {
       supabase.from("categories").select("*").order("name", { ascending: true })
     ]);
 
-    const endTime = performance.now();
-    
-    if (notesRes.data) {
-      const payloadSizeKB = JSON.stringify(notesRes.data).length / 1024;
-      console.log(`[DEBUG] Fetched ${notesRes.data.length} notes in ${(endTime - startTime).toFixed(2)}ms.`);
-      console.log(`[DEBUG] Initial payload size: ~${payloadSizeKB.toFixed(2)} KB (Images excluded)`);
-      
-      // UPDATE THIS LINE:
-      setNotes(notesRes.data as unknown as Note[]);
-    }
-    
+    if (notesRes.data) setNotes(notesRes.data as unknown as Note[]);
     if (catRes.data) setCategories(catRes.data as Category[]);
     setLoading(false);
   }, [supabase]);
@@ -66,30 +53,21 @@ export default function NotesPage() {
     fetchData();
   }, [fetchData]);
 
-  // FIXED: Fetch the image only when requested
+  // 2. Fetch the image URL only when requested
   async function fetchAndShowImage(noteId: string) {
     setIsFetchingImage(noteId);
-    console.log(`[DEBUG] Requesting full image for note ID: ${noteId}`);
-    const startTime = performance.now();
-
+    
     const { data, error } = await supabase
       .from("notes")
       .select("image_url")
       .eq("id", noteId)
       .single();
 
-    const endTime = performance.now();
-
     if (error) {
-      console.error("[DEBUG] Error fetching image:", error);
       alert("Failed to load image.");
     } else if (data?.image_url) {
-      const imageSizeMB = data.image_url.length / (1024 * 1024);
-      console.log(`[DEBUG] Image fetched in ${(endTime - startTime).toFixed(2)}ms.`);
-      console.log(`[DEBUG] Downloaded image size: ~${imageSizeMB.toFixed(2)} MB`);
       setEnlargedImage(data.image_url);
     } else {
-      console.log("[DEBUG] No image found in database for this note.");
       alert("No image attached to this note.");
     }
     
@@ -148,16 +126,42 @@ export default function NotesPage() {
     else await fetchData();
   }
 
+  // 3. NEW STORAGE UPLOAD LOGIC
   async function toggleNoteCompletion(id: string, file?: File) {
     try {
       const isCompleting = !!file;
-      console.log("[DEBUG] Processing image upload...");
-      const image_url = file ? await convertFileToBase64(file) : null;
-      if (image_url) {
-         console.log(`[DEBUG] Upload payload size: ~${(image_url.length / (1024 * 1024)).toFixed(2)} MB`);
+      let finalImageUrl = null;
+
+      if (file) {
+        // Get the current user for organizing files in the bucket
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        // Create a unique file name to prevent overwriting
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${user?.id || 'anonymous'}/${fileName}`;
+
+        // Upload the file to the 'note-photos' bucket
+        const { error: uploadError } = await supabase.storage
+          .from('note-photos')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get the public URL to save in the database
+        const { data } = supabase.storage
+          .from('note-photos')
+          .getPublicUrl(filePath);
+          
+        finalImageUrl = data.publicUrl;
       }
       
-      const { error } = await supabase.from("notes").update({ is_complete: isCompleting, image_url }).eq("id", id);
+      // Update the note with the new URL (or null if reverting completion)
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_complete: isCompleting, image_url: finalImageUrl })
+        .eq("id", id);
+        
       if (error) throw error;
       await fetchData();
     } catch (err: any) {
@@ -241,7 +245,6 @@ export default function NotesPage() {
                       >
                         {isFetchingImage === note.id ? "Fetching image..." : "View memory photo"}
                       </button>
-                      
                     </div>
                   ) : (
                     <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-rose-200 bg-rose-50/50 px-4 py-3 text-sm font-semibold text-rose-500 hover:bg-rose-50 transition-colors">
@@ -305,18 +308,19 @@ export default function NotesPage() {
         </div>
       )}
 
+      {/* Enlarged Image Modal */}
       {enlargedImage && (
         <div 
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setEnlargedImage(null)}
         >
-          <div className="relative max-w-4xl w-full h-auto">
+          <div className="relative max-w-4xl w-full h-auto flex flex-col items-center">
             <Image 
               src={enlargedImage} 
               alt="Enlarged memory" 
               width={800} 
               height={600} 
-              className="rounded-2xl w-full h-auto" 
+              className="rounded-2xl w-full h-auto object-contain max-h-[80vh]" 
               unoptimized 
             />
             <button 
