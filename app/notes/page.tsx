@@ -30,14 +30,27 @@ export default function NotesPage() {
   const supabase = createClient();
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    const [notesRes, catRes] = await Promise.all([
-      supabase.from("notes").select("*, categories(name, color)").order("created_at", { ascending: false }),
-      supabase.from("categories").select("*").order("name", { ascending: true })
-    ]);
+  setLoading(true);
+  
+  // Update the query to be more explicit, similar to the Dashboard
+  const { data: notesData, error } = await supabase
+      .from("notes")
+      .select("*, categories(name, color)")
+      .order("created_at", { ascending: false });
 
-    if (notesRes.data) setNotes(notesRes.data as Note[]);
-    if (catRes.data) setCategories(catRes.data as Category[]);
+    if (error) {
+      console.error("Error fetching notes:", error);
+    } else if (notesData) {
+      setNotes(notesData as Note[]);
+    }
+
+    const { data: catRes } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (catRes) setCategories(catRes as Category[]);
+    
     setLoading(false);
   }, [supabase]);
 
