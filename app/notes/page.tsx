@@ -133,22 +133,24 @@ export default function NotesPage() {
       let finalImageUrl = null;
 
       if (file) {
-        // Get the current user for organizing files in the bucket
-        const { data: { user } } = await supabase.auth.getUser();
+        // Use YOUR custom cookie auth instead of Supabase Auth!
+        const currentUser = getCurrentUser(); // Returns "William" or "Marie-Laure"
         
-        // Create a unique file name to prevent overwriting
+        // Create a unique file name
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${user?.id || 'anonymous'}/${fileName}`;
+        
+        // Save the file in a folder named after the user (e.g., "William/12345.jpg")
+        const filePath = `${currentUser}/${fileName}`;
 
-        // Upload the file to the 'note-photos' bucket
+        // Upload the file
         const { error: uploadError } = await supabase.storage
           .from('note-photos')
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) throw new Error("Storage Error: " + uploadError.message);
 
-        // Get the public URL to save in the database
+        // Get the public URL
         const { data } = supabase.storage
           .from('note-photos')
           .getPublicUrl(filePath);
@@ -156,16 +158,17 @@ export default function NotesPage() {
         finalImageUrl = data.publicUrl;
       }
       
-      // Update the note with the new URL (or null if reverting completion)
-      const { error } = await supabase
+      // Update the database
+      const { error: dbError } = await supabase
         .from("notes")
         .update({ is_complete: isCompleting, image_url: finalImageUrl })
         .eq("id", id);
         
-      if (error) throw error;
+      if (dbError) throw new Error("Database Error: " + dbError.message);
+      
       await fetchData();
     } catch (err: any) {
-      alert("Error updating status: " + err.message);
+      alert(err.message);
     }
   }
 
